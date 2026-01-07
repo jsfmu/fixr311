@@ -34,6 +34,7 @@ Create report → generate draft → save → share link → map pins.
 - **location** must always be stored as GeoJSON Point with `[lng, lat]` order.
 - **approxLocation** indicates whether coordinates have been rounded (privacy mode).
 - **photo.stored** is `false` by default; only true if the user explicitly opts in.
+- When `approxLocation=true`, the API rounds coords to 3 decimals (~110m) before insert.
 
 ---
 
