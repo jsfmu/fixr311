@@ -1,8 +1,11 @@
-import "dotenv/config";
-import { getReportsCollection } from "../src/lib/db";
-import { buildTemplateDraft } from "../src/lib/draft";
-import { DEFAULT_PHOTO, type IssueType, type Severity } from "../src/lib/types";
-import { applyApproxLocation, toGeoPoint } from "../src/lib/validation";
+import path from "node:path";
+import { config } from "dotenv";
+import type { IssueType, Severity } from "../src/lib/types";
+
+// Load env before importing any DB code
+const cwd = process.cwd();
+config({ path: path.join(cwd, ".env.local") });
+config();
 
 type SeedInput = {
   issueType: IssueType;
@@ -144,6 +147,11 @@ const seeds: SeedInput[] = [
 ];
 
 async function run() {
+  const { getReportsCollection } = await import("../src/lib/db");
+  const { buildTemplateDraft } = await import("../src/lib/draft");
+  const { DEFAULT_PHOTO } = await import("../src/lib/types");
+  const { applyApproxLocation, toGeoPoint } = await import("../src/lib/validation");
+
   const collection = await getReportsCollection();
   await collection.deleteMany({ descriptionUser: { $regex: "\\[seed\\]" } });
 
