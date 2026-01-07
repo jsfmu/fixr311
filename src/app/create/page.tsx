@@ -3,7 +3,12 @@
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { buildTemplateDraft } from "@/lib/draft";
+import {
+  StructuredDraft,
+  buildStructuredTemplateDraft,
+  buildTemplateDraft,
+  structuredDraftToText,
+} from "@/lib/draft";
 import { ISSUE_TYPES, SEVERITIES, type IssueType, type Severity } from "@/lib/types";
 
 const LocationPicker = dynamic(() => import("@/components/map/LocationPicker"), {
@@ -37,6 +42,9 @@ export default function CreatePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [draftSource, setDraftSource] = useState<"ai" | "template" | null>(null);
+  const [structuredDraft, setStructuredDraft] = useState<StructuredDraft | null>(
+    null,
+  );
 
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -74,25 +82,33 @@ export default function CreatePage() {
         body: JSON.stringify({
           issueType,
           severity,
-          descriptionUser,
-          locationText,
-          approxLocation,
+          notes: descriptionUser,
+          location: location
+            ? { ...location, approx: approxLocation }
+            : undefined,
+          landmark: locationText,
         }),
       });
       if (!res.ok) throw new Error("Draft generation failed");
       const data = await res.json();
-      setDescriptionFinal(data.draft);
-      setDraftSource(data.source || "ai");
+      const draft = data.draft as StructuredDraft;
+      setStructuredDraft(draft);
+      const combined = structuredDraftToText(draft);
+      setDescriptionFinal(combined);
+      setDraftSource(data.usedAI ? "ai" : "template");
     } catch (err) {
       console.error(err);
-      const fallback = buildTemplateDraft({
+      const fallbackDraft = buildStructuredTemplateDraft({
         issueType,
         severity,
         descriptionUser,
         locationText,
         approxLocation,
+        location,
       });
-      setDescriptionFinal(fallback);
+      setStructuredDraft(fallbackDraft);
+      const combined = structuredDraftToText(fallbackDraft);
+      setDescriptionFinal(combined);
       setDraftSource("template");
       setError("Draft generation failed; used fallback template.");
     } finally {
@@ -111,6 +127,7 @@ export default function CreatePage() {
 
     const finalText =
       descriptionFinal.trim() ||
+      (structuredDraft ? structuredDraftToText(structuredDraft) : "") ||
       buildTemplateDraft({
         issueType,
         severity,
@@ -288,19 +305,134 @@ export default function CreatePage() {
               disabled={loadingDraft}
               className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed"
             >
-              {loadingDraft ? "Generating..." : "Generate draft"}
+              {loadingDraft ? "Generating..." : "Enhance draft"}
             </button>
           </div>
+
+          <div className="space-y-3 rounded-md border border-slate-200 p-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-slate-800">
+                Enhanced draft (editable fields)
+              </p>
+              {draftSource ? (
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                  {draftSource === "ai" ? "AI" : "Template"}
+                </span>
+              ) : null}
+            </div>
+
+            {structuredDraft ? (
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label htmlFor="title" className="text-sm">
+                    Title
+                  </label>
+                  <input
+                    id="title"
+                    type="text"
+                    maxLength={80}
+                    value={structuredDraft.title}
+                    onChange={(e) => {
+                      const updated = {
+                        ...structuredDraft,
+                        title: e.target.value,
+                      };
+                      setStructuredDraft(updated);
+                      setDescriptionFinal(structuredDraftToText(updated));
+                    }}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label htmlFor="summary" className="text-sm">
+                    Summary
+                  </label>
+                  <textarea
+                    id="summary"
+                    rows={2}
+                    value={structuredDraft.summary}
+                    onChange={(e) => {
+                      const updated = {
+                        ...structuredDraft,
+                        summary: e.target.value,
+                      };
+                      setStructuredDraft(updated);
+                      setDescriptionFinal(structuredDraftToText(updated));
+                    }}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label htmlFor="details" className="text-sm">
+                    Details
+                  </label>
+                  <textarea
+                    id="details"
+                    rows={3}
+                    value={structuredDraft.details}
+                    onChange={(e) => {
+                      const updated = {
+                        ...structuredDraft,
+                        details: e.target.value,
+                      };
+                      setStructuredDraft(updated);
+                      setDescriptionFinal(structuredDraftToText(updated));
+                    }}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label htmlFor="requested" className="text-sm">
+                    Requested action
+                  </label>
+                  <textarea
+                    id="requested"
+                    rows={2}
+                    value={structuredDraft.requested_action}
+                    onChange={(e) => {
+                      const updated = {
+                        ...structuredDraft,
+                        requested_action: e.target.value,
+                      };
+                      setStructuredDraft(updated);
+                      setDescriptionFinal(structuredDraftToText(updated));
+                    }}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label htmlFor="safety" className="text-sm">
+                    Safety note (optional)
+                  </label>
+                  <input
+                    id="safety"
+                    type="text"
+                    value={structuredDraft.safety_note}
+                    onChange={(e) => {
+                      const updated = {
+                        ...structuredDraft,
+                        safety_note: e.target.value,
+                      };
+                      setStructuredDraft(updated);
+                      setDescriptionFinal(structuredDraftToText(updated));
+                    }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-slate-600">
+                Click “Enhance draft” to generate AI or template text. Fields stay
+                editable before saving.
+              </p>
+            )}
+          </div>
+
           <textarea
             id="draft"
             rows={6}
             value={descriptionFinal}
             onChange={(e) => setDescriptionFinal(e.target.value)}
-            placeholder="Draft text will appear here. You can edit it before saving."
+            placeholder="Combined draft text appears here. You can edit this directly before saving."
           />
           <p className="text-xs text-slate-500">
-            You can always edit the draft. If AI is unavailable, a fallback template
-            is used automatically.
+            Edits to the fields above sync here. You can also edit this combined
+            text directly before saving.
           </p>
         </div>
 

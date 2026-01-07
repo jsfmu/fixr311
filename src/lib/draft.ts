@@ -10,6 +10,17 @@ export interface DraftRequest {
   approxLocation?: boolean;
 }
 
+export interface StructuredDraft {
+  title: string;
+  summary: string;
+  details: string;
+  requested_action: string;
+  safety_note: string;
+  suggested_issue_type: string;
+  suggested_severity: Severity;
+  tags: string[];
+}
+
 export async function generateDraft(
   input: DraftRequest,
 ): Promise<{ draft: string; source: "ai" | "template" }> {
@@ -34,6 +45,52 @@ export async function generateDraft(
   }
 
   return { draft: template, source: "template" };
+}
+
+export function buildStructuredTemplateDraft(
+  input: DraftRequest & {
+    location?: { lat: number; lng: number } | null;
+  },
+): StructuredDraft {
+  const rounded = input.approxLocation
+    ? roundLocation(input.location)
+    : input.location;
+  const locationText =
+    input.locationText ||
+    (rounded
+      ? `near ${rounded.lat.toFixed(3)}, ${rounded.lng.toFixed(3)}`
+      : "at the pinned location");
+
+  const readableIssue = input.issueType.replace("_", " ");
+  const notes = input.descriptionUser?.trim() || "No additional notes provided.";
+  const severity = input.severity;
+
+  const safety_note = hasEmergencyTerms(notes)
+    ? "If this is an emergency, call 911."
+    : "";
+
+  return {
+    title: `Report: ${readableIssue}`,
+    summary: `Reported ${readableIssue} (${severity}) ${locationText}.`,
+    details: `Details: ${notes}`,
+    requested_action: "Please inspect and address. Photo not stored in this MVP.",
+    safety_note,
+    suggested_issue_type: input.issueType,
+    suggested_severity: severity,
+    tags: buildTags(readableIssue, severity, input.approxLocation),
+  };
+}
+
+export function structuredDraftToText(draft: StructuredDraft): string {
+  const parts = [
+    draft.title,
+    draft.summary,
+    draft.details,
+    draft.requested_action,
+  ];
+  if (draft.safety_note) parts.push(draft.safety_note);
+  if (draft.tags.length) parts.push(`Tags: ${draft.tags.join(", ")}`);
+  return parts.join(" ");
 }
 
 async function aiGenerate(input: DraftRequest, apiKey: string) {
@@ -119,5 +176,38 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, message: string) 
     clearTimeout(timeoutId);
   }
   return result;
+}
+
+function roundLocation(
+  location?: { lat: number; lng: number } | null,
+): { lat: number; lng: number } | null {
+  if (!location) return null;
+  return {
+    lat: Math.round(location.lat * 1000) / 1000,
+    lng: Math.round(location.lng * 1000) / 1000,
+  };
+}
+
+function buildTags(
+  readableIssue: string,
+  severity: Severity,
+  approxLocation?: boolean,
+): string[] {
+  const tags = [readableIssue, severity];
+  if (approxLocation) tags.push("approx-location");
+  return tags.slice(0, 6);
+}
+
+function hasEmergencyTerms(text?: string) {
+  if (!text) return false;
+  const lower = text.toLowerCase();
+  return (
+    lower.includes("fire") ||
+    lower.includes("gun") ||
+    lower.includes("injury") ||
+    lower.includes("injured") ||
+    lower.includes("stabbing") ||
+    lower.includes("shooting")
+  );
 }
 
