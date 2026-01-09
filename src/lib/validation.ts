@@ -53,10 +53,10 @@ export function parseLocation(
   const lng = toNumber(location.lng);
   const lat = toNumber(location.lat);
 
-  if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
+  if (lng === null || !Number.isFinite(lng) || lng < -180 || lng > 180) {
     return { success: false, error: "lng must be between -180 and 180" };
   }
-  if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
+  if (lat === null || !Number.isFinite(lat) || lat < -90 || lat > 90) {
     return { success: false, error: "lat must be between -90 and 90" };
   }
 
