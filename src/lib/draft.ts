@@ -1,6 +1,17 @@
 import { IssueType, Severity } from "./types";
 
 const AI_TIMEOUT_MS = 10_000;
+export const EMERGENCY_TERMS = [
+  "fire",
+  "crash",
+  "injury",
+  "injured",
+  "gun",
+  "stabbing",
+  "explosion",
+  "shooting",
+  "bleeding",
+];
 
 export interface DraftRequest {
   issueType: IssueType;
@@ -201,13 +212,6 @@ function buildTags(
 function hasEmergencyTerms(text?: string) {
   if (!text) return false;
   const lower = text.toLowerCase();
-  return (
-    lower.includes("fire") ||
-    lower.includes("gun") ||
-    lower.includes("injury") ||
-    lower.includes("injured") ||
-    lower.includes("stabbing") ||
-    lower.includes("shooting")
-  );
+  return EMERGENCY_TERMS.some((word) => lower.includes(word));
 }
 

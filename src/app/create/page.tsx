@@ -7,6 +7,7 @@ import {
   StructuredDraft,
   buildStructuredTemplateDraft,
   buildTemplateDraft,
+  EMERGENCY_TERMS,
   structuredDraftToText,
 } from "@/lib/draft";
 import { ISSUE_TYPES, SEVERITIES, type IssueType, type Severity } from "@/lib/types";
@@ -16,16 +17,6 @@ const LocationPicker = dynamic(() => import("@/components/map/LocationPicker"), 
 });
 
 const DEFAULT_CENTER = { lat: 37.7936, lng: -122.2655 }; // Alameda / Oakland area
-const EMERGENCY_WORDS = [
-  "fire",
-  "crash",
-  "injured",
-  "gun",
-  "stabbing",
-  "explosion",
-  "shooting",
-  "bleeding",
-];
 
 export default function CreatePage() {
   const router = useRouter();
@@ -61,7 +52,7 @@ export default function CreatePage() {
 
   const emergencyWarning = useMemo(() => {
     const text = descriptionUser.toLowerCase();
-    return EMERGENCY_WORDS.some((word) => text.includes(word));
+    return EMERGENCY_TERMS.some((word) => text.includes(word));
   }, [descriptionUser]);
 
   const confirmPinText = approxLocation
